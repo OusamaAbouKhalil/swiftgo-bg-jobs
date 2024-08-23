@@ -5,7 +5,7 @@ const {DateTime} = require("luxon"); // Using Luxon for time manipulation
 const db = admin.firestore();
 
 exports.updateRestaurantStatus = functions.pubsub
-    .schedule("every hour") // Schedule to run every 5 minutes
+    .schedule("0 * * * *") // Schedule to start evry start of the hour
     .timeZone("Asia/Beirut") // Set to Beirut time zone
     .onRun(async (context) => {
       try {
