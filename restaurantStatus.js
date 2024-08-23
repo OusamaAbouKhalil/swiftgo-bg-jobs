@@ -5,14 +5,20 @@ const {DateTime} = require("luxon"); // Using Luxon for time manipulation
 const db = admin.firestore();
 
 exports.updateRestaurantStatus = functions.pubsub
-    .schedule("every 5 minutes") // Schedule to run every 5 minutes
+    .schedule("every hour") // Schedule to run every 5 minutes
     .timeZone("Asia/Beirut") // Set to Beirut time zone
     .onRun(async (context) => {
       try {
-        // Get current time in Lebanon (Beirut time zone)
+      // Get current time in Lebanon (Beirut time zone)
         const currentTime = DateTime.now().setZone("Asia/Beirut");
         const currentDay = currentTime.toFormat("cccc");
         // Current day (e.g., Monday)
+        const currentHour = currentTime.hour;
+
+        if (currentHour < 8 && currentHour >= 1) {
+          console.log("Function executed outside allowed time window.");
+          return null;
+        }
 
         // Get all restaurants from Firestore
         const restaurantsSnapshot = await db.collection("restaurants").get();
@@ -32,26 +38,25 @@ exports.updateRestaurantStatus = functions.pubsub
 
                 // Parse opening and closing time
                 // to DateTime objects in Beirut time
-                const openingTime = DateTime.fromFormat(
-                    openingTimeStr,
-                    "h:mm a",
-                    {zone: "Asia/Beirut"},
-                );
-                const closingTime = DateTime.fromFormat(
-                    closingTimeStr,
-                    "h:mm a",
-                    {zone: "Asia/Beirut"},
-                );
+                const openingTime =
+                DateTime.fromFormat(openingTimeStr, "h:mm a", {
+                  zone: "Asia/Beirut",
+                });
+                const closingTime =
+                DateTime.fromFormat(closingTimeStr, "h:mm a", {
+                  zone: "Asia/Beirut",
+                });
 
                 // Determine if the restaurant is currently open or closed
                 const isCurrentlyOpen =
-                    currentTime >= openingTime && currentTime <= closingTime;
+              currentTime >= openingTime && currentTime <= closingTime;
 
                 // Update the isClosed field in
                 // Firestore based on the calculated status
-                await db.collection("restaurants").doc(restaurantDoc.id).set({
-                  isClosed: !isCurrentlyOpen,
-                });
+                await db.collection("restaurants")
+                    .doc(restaurantDoc.id).update({
+                      isClosed: !isCurrentlyOpen,
+                    });
 
                 console.log(`Updated isClosed for 
                   ${restaurantDoc.id}: ${!isCurrentlyOpen}`);
