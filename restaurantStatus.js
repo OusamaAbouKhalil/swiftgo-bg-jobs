@@ -23,49 +23,44 @@ exports.updateRestaurantStatus = functions.pubsub
         // Get all restaurants from Firestore
         const restaurantsSnapshot = await db.collection("restaurants").get();
 
+        // Process each restaurant
         await Promise.all(
-            restaurantsSnapshot.docs.map(async (restaurantDoc) => {
-              const restaurantData = restaurantDoc.data();
+            restaurantsSnapshot.docs
+                .map(async (restaurantDoc) => {
+                  const restaurantData = restaurantDoc.data();
+                  const dayTimes = restaurantData.hours[currentDay];
 
-              // Retrieve opening and closing times for the current day
-              const dayTimes = restaurantData.hours[currentDay];
-              // Assume hours is an object with day-specific times
+                  if (dayTimes && Array.isArray(dayTimes)) {
+                    // Check if the restaurant is currently open
+                    const isCurrentlyOpen = dayTimes.some((period) => {
+                      // Parse opening and closing
+                      // times for each period
+                      const openingTime = DateTime.
+                          fromFormat(period.openingTime,
+                              "h:mm a", {zone: "Asia/Beirut"});
+                      const closingTime = DateTime.
+                          fromFormat(period.closingTime,
+                              "h:mm a", {zone: "Asia/Beirut"});
 
-              if (dayTimes) {
-                // Retrieve opening and closing times from the dayTimes object
-                const openingTimeStr = dayTimes.openingTime;
-                const closingTimeStr = dayTimes.closingTime;
-
-                // Parse opening and closing time
-                // to DateTime objects in Beirut time
-                const openingTime =
-                DateTime.fromFormat(openingTimeStr, "h:mm a", {
-                  zone: "Asia/Beirut",
-                });
-                const closingTime =
-                DateTime.fromFormat(closingTimeStr, "h:mm a", {
-                  zone: "Asia/Beirut",
-                });
-
-                // Determine if the restaurant is currently open or closed
-                const isCurrentlyOpen =
-              currentTime >= openingTime && currentTime <= closingTime;
-
-                // Update the isClosed field in
-                // Firestore based on the calculated status
-                await db.collection("restaurants")
-                    .doc(restaurantDoc.id).update({
-                      isClosed: !isCurrentlyOpen,
+                      // Determine if current time is
+                      // within any of the open periods
+                      return currentTime >= openingTime &&
+              currentTime <= closingTime;
                     });
 
-                console.log(`Updated isClosed for 
-                  ${restaurantDoc.id}: ${!isCurrentlyOpen}`);
-              } else {
-                console.log(`No opening hours found for
-                   ${restaurantDoc.id} on ${currentDay}`);
-              }
-            }),
-        );
+                    // Update the isClosed field in Firestore
+                    await db.collection("restaurants")
+                        .doc(restaurantDoc.id).update({
+                          isClosed: !isCurrentlyOpen,
+                        });
+
+                    console.log(`Updated isClosed for 
+              ${restaurantDoc.id}: ${!isCurrentlyOpen}`);
+                  } else {
+                    console.log(`No valid opening hours found for 
+              ${restaurantDoc.id} on ${currentDay}`);
+                  }
+                }));
 
         return null;
       } catch (error) {
